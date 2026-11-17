@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>外卖双层选择转盘</title>
+<style>
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+body{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  background:#f4f4f4;
+  font-family:"Microsoft YaHei",sans-serif;
+  padding:20px;
+}
+.wrap{
+  position:relative;
+  width:min(90vw,420px);
+  height:min(90vw,420px);
+  margin-bottom:30px;
+}
+.pointer{
+  position:absolute;
+  top:-5px;
+  left:50%;
+  transform:translateX(-50%);
+  width:0;
+  height:0;
+  border-left:18px solid transparent;
+  border-right:18px solid transparent;
+  border-top:28px solid #e63946;
+  z-index:9;
+}
+#wheel{
+  width:100%;
+  height:100%;
+  border-radius:50%;
+  box-shadow:0 0 14px #00000022;
+  transition: all 4s cubic-bezier(0.17,0.67,0.12,0.99);
+}
+#btn{
+  padding:14px 40px;
+  border:none;
+  border-radius:10px;
+  background:#ff6700;
+  color:#fff;
+  font-size:18px;
+  cursor:pointer;
+}
+#btn:disabled{
+  background:#888;
+  cursor:not-allowed;
+}
+#result{
+  margin-top:24px;
+  font-size:22px;
+  font-weight:bold;
+  text-align:center;
+}
+#tip{
+  margin-bottom:16px;
+  font-size:18px;
+}
+</style>
+</head>
+<body>
+<div id="tip">第一轮：先选择外卖大类</div>
+<div class="wrap">
+  <div class="pointer"></div>
+  <canvas id="wheel" width="420" height="420"></canvas>
+</div>
+<button id="btn">开始转动</button>
+<div id="result"></div>
+
+<script>
+// 17个外卖大类
+const categoryData = [
+  {name:"火锅串串",color:"#E63946"},
+  {name:"龙虾烧烤",color:"#FF7F50"},
+  {name:"轻食沙拉",color:"#2A9D8F"},
+  {name:"暖胃粉丝汤",color:"#4682B4"},
+  {name:"东南亚菜",color:"#9C27B0"},
+  {name:"韩式料理",color:"#DC143C"},
+  {name:"香锅干锅",color:"#FF4500"},
+  {name:"特色小吃",color:"#FFD700"},
+  {name:"能量西餐",color:"#8B4513"},
+  {name:"夹馍饼类",color:"#DAA520"},
+  {name:"鸭脖卤味",color:"#B22222"},
+  {name:"日料寿司",color:"#20B2AA"},
+  {name:"米粉面馆",color:"#6495ED"},
+  {name:"麻辣烫冒菜",color:"#FF6347"},
+  {name:"川湘菜",color:"#C0392B"},
+  {name:"地方菜系",color:"#1ABC9C"},
+  {name:"炸鸡炸串",color:"#F39C12"}
+];
+
+// 每个大类里面20个菜品
+const foodMap = {
+  "火锅串串": [
+    "牛肉串串", "毛肚", "鸭肠", "贡菜", "黄喉",
+    "虾滑", "鹌鹑蛋", "土豆片", "金针菇", "海带结",
+    "肥牛卷", "鸭血", "午餐肉", "藕片", "豆腐",
+    "肥肠", "脑花", "青笋", "蟹棒", "宽粉"
+  ],
+  "龙虾烧烤": [
+    "蒜蓉小龙虾", "香辣小龙虾", "烤羊肉串", "烤牛肉串", "烤五花肉",
+    "烤茄子", "烤韭菜", "烤金针菇", "烤生蚝", "烤扇贝",
+    "烤鸡腿", "烤鸡翅", "烤面筋", "烤土豆片", "烤玉米",
+    "香辣田螺", "烤鱿鱼", "烤鸡爪", "烤豆腐", "椒盐虾"
+  ],
+  "轻食沙拉": [
+    "鸡胸肉沙拉", "牛肉沙拉", "虾仁沙拉", "金枪鱼沙拉", "鸡蛋蔬菜沙拉",
+    "牛油果沙拉", "水果沙拉", "紫米沙拉碗", "藜麦沙拉", "西兰花沙拉",
+    "番茄黄瓜沙拉", "玉米沙拉", "蘑菇沙拉", "豆腐沙拉", "三文鱼沙拉",
+    "苦苣沙拉", "苹果沙拉", "橙子沙拉", "坚果沙拉", "紫薯沙拉"
+  ],
+  "暖胃粉丝汤": [
+    "鸭血粉丝汤", "牛肉粉丝汤", "鸡汤粉丝", "酸辣粉丝汤", "排骨粉丝汤",
+    "虾仁粉丝汤", "番茄粉丝汤", "菌菇粉丝汤", "肥肠粉丝汤", "鱼片粉丝汤",
+    "青菜粉丝汤", "火腿粉丝汤", "豆腐粉丝汤", "丸子粉丝汤", "萝卜粉丝汤",
+    "海带粉丝汤", "鸡蛋粉丝汤", "咖喱粉丝汤", "酸菜粉丝汤", "羊肉粉丝汤"
+  ],
+  "东南亚菜": [
+    "冬阴功汤", "黄咖喱鸡", "菠萝炒饭", "香茅烤鸡", "青木瓜沙拉",
+    "椰香咖喱牛肉", "芒果糯米饭", "越南河粉", "泰式炒河粉", "咖喱鱼蛋",
+    "香茅虾", "泰式凤爪", "椰子鸡汤", "马来咖喱", "沙爹肉串",
+    "印尼炒饭", "柠檬鱼", "泰式奶茶饭", "菠萝咕咾肉", "蒜香大虾"
+  ],
+  "韩式料理": [
+    "部队火锅", "石锅拌饭", "韩式炸鸡", "冷面", "辣炒年糕",
+    "紫菜包饭", "烤肉拼盘", "大酱汤", "泡菜汤", "土豆排骨汤",
+    "芝士年糕", "韩式炸酱面", "海鲜饼", "泡菜炒饭", "烤五花肉",
+    "海带汤", "炒鱿鱼", "鸡蛋羹", "芝士玉米", "韩式饭团"
+  ],
+  "香锅干锅": [
+    "麻辣香锅", "干锅虾", "干锅牛蛙", "干锅花菜", "干锅土豆",
+    "干锅肥肠", "干锅鸡", "干锅鸭头", "干锅排骨", "干锅鱿鱼",
+    "干锅菌菇", "干锅藕片", "干锅虾滑", "干锅豆腐", "干锅五花肉",
+    "干锅莴笋", "干锅毛肚", "干锅丸子", "干锅鸡爪", "干锅卷心菜"
+  ],
+  "特色小吃": [
+    "手抓饼", "烤红薯", "狼牙土豆", "凉面", "冰粉",
+    "汤圆", "抄手", "锅盔", "炸土豆", "豆腐脑",
+    "酸辣粉", "蛋烘糕", "红糖糍粑", "酥肉", "蒸饺",
+    "烧麦", "钵钵鸡", "凉糕", "烤肠", "小酥肉"
+  ],
+  "能量西餐": [
+    "牛排", "意面", "汉堡", "披萨", "焗饭",
+    "薯条", "奥尔良鸡翅", "罗宋汤", "奶油蘑菇汤", "沙拉牛排",
+    "三明治", "可颂", "土豆泥", "烤鸡", "黑椒牛柳意面",
+    "海鲜披萨", "芝士焗薯泥", "洋葱圈", "培根意面", "牛肉汉堡"
+  ],
+  "夹馍饼类": [
+    "肉夹馍", "鸡蛋灌饼", "酱香饼", "烧饼夹里脊", "葱油饼",
+    "韭菜盒子", "手抓饼加肠", "梅干菜饼", "掉渣烧饼", "牛肉饼",
+    "馅饼", "南瓜饼", "豆沙饼", "葱花饼", "夹菜夹馍",
+    "腊汁肉夹馍", "鸡柳饼", "土豆丝饼", "红糖饼", "椒盐烧饼"
+  ],
+  "鸭脖卤味": [
+    "鸭脖", "鸭翅", "鸭掌", "鸭锁骨", "鸭头",
+    "卤牛肉", "卤鸡爪", "卤藕", "卤豆干", "卤海带",
+    "卤猪蹄", "卤肥肠", "卤鸡蛋", "卤毛豆", "卤花生",
+    "卤鸭肠", "卤鸡尖", "卤土豆", "卤金针菇", "卤郡肝"
+  ],
+  "日料寿司": [
+    "三文鱼寿司", "金枪鱼寿司", "鳗鱼寿司", "蟹棒寿司", "牛油果寿司",
+    "军舰寿司", "手握寿司", "刺身拼盘", "乌冬面", "寿喜烧",
+    "天妇罗", "章鱼小丸子", "鳗鱼饭", "三文鱼刺身", "北极贝刺身",
+    "海草寿司", "玉子寿司", "咖喱猪排饭", "味增汤", "加州卷"
+  ],
+  "米粉面馆": [
+    "牛肉米粉", "肥肠米粉", "杂酱面", "牛肉面", "刀削面",
+    "螺蛳粉", "桂林米粉", "酸辣面", "番茄鸡蛋面", "排骨面",
+    "鸡杂面", "豌杂面", "凉面", "担担面", "鲜虾米粉",
+    "酸菜面", "羊肉面", "炒米粉", "炒面", "馄饨面"
+  ],
+   "麻辣烫冒菜": [
+     "牛肉冒菜", "毛肚冒菜", "素菜麻辣烫", "虾滑麻辣烫", "肥牛麻辣烫",
+     "鸭血冒菜", "午餐肉麻辣烫", "贡菜冒菜", "金针菇麻辣烫", "海带结冒菜",
+     "宽粉麻辣烫", "藕片冒菜", "土豆片麻辣烫", "豆腐冒菜", "肥肠冒菜",
+     "脑花冒菜", "蟹棒麻辣烫", "鹌鹑蛋冒菜", "青笋冒菜", "丸子麻辣烫"
+   ],
+   "川湘菜": [
+     "麻婆豆腐", "水煮鱼", "水煮牛肉", "回锅肉", "辣子鸡",
+     "剁椒鱼头", "鱼香肉丝", "宫保鸡丁", "毛血旺", "干锅肥肠",
+     "小炒黄牛肉", "酸辣土豆丝", "酸菜鱼", "青椒肉丝", "泡椒鸡杂",
+     "干煸四季豆", "水煮肉片", "香辣虾", "擂椒皮蛋", "金钱蛋"
+   ],
+   "地方菜系": [
+     "粤菜烧鹅", "苏式红烧肉", "浙菜西湖醋鱼", "闽菜佛跳墙", "鲁菜糖醋鲤鱼",
+     "徽菜臭鳜鱼", "滇菜汽锅鸡", "黔菜酸汤鱼", "新疆大盘鸡", "东北锅包肉",
+     "陕西羊肉泡馍", "天津狗不理", "海南文昌鸡", "广西螺蛳粉", "江西瓦罐汤",
+     "甘肃手抓羊肉", "西藏牦牛肉", "内蒙烤羊腿", "河北驴肉火烧", "河南烩面"
+   ],
+   "炸鸡炸串": [
+     "原味炸鸡", "香辣炸鸡", "蜂蜜黄油炸鸡", "年糕炸鸡", "炸鸡腿",
+     "炸鸡翅", "炸鸡柳", "炸薯条", "炸茄子", "炸蘑菇",
+     "炸年糕", "炸火腿肠", "炸里脊肉", "炸藕盒", "炸鱼排",
+     "炸鱿鱼圈", "炸臭豆腐", "炸青椒", "炸鹌鹑蛋", "炸土豆串"
+   ]
+ };
+ const canvas = document.getElementById('wheel');
+ const ctx = canvas.getContext('2d');
+ const btn = document.getElementById('btn');
+ const resultDom = document.getElementById('result');
+ const tipDom = document.getElementById('tip');
+ let currentList = JSON.parse(JSON.stringify(categoryData));
+ let stage = 1; // 1大类，2菜品
+ let totalAngle = 0;
+ // 绘制转盘
+ function drawWheel(list){
+   const count = list.length;
+   const perAngle = Math.PI * 2 / count;
+   ctx.clearRect(0,0,420,420);
+   for(let i=0;i<count;i++){
+     const start = i * perAngle;
+     ctx.beginPath();
+     ctx.moveTo(210,210);
+     ctx.arc(210,210,200,start,start+perAngle);
+     ctx.fillStyle = list[i].color;
+     ctx.fill();
+     ctx.save();
+     ctx.translate(210,210);
+     ctx.rotate(start + perAngle/2);
+     ctx.fillStyle="#fff";
+     ctx.font="bold 13px Microsoft YaHei";
+     ctx.textAlign="center";
+     ctx.fillText(list[i].name,130,5);
+     ctx.restore();
+   }
+ }
+ // 生成随机颜色（菜品轮用）
+ function getRandomColor(){
+   const arr = ['#ff4757','#2f3542','#2ed573','#1e90ff','#ffa502','#ff6b81','#70a1ff','#7bed9f'];
+   return arr[Math.floor(Math.random()*arr.length)];
+ }
+ btn.onclick = async function(){
+   btn.disabled = true;
+   resultDom.innerText = "";
+   const count = currentList.length;
+   const perAngle = 360 / count;
+   const randomRound = 5 + Math.floor(Math.random()*6);
+   const randomIndex = Math.floor(Math.random()*count);
+   const targetRotate = totalAngle + randomRound * 360 + (randomIndex * perAngle);
+   totalAngle = targetRotate;
+   canvas.style.transform = `rotate(${targetRotate}deg)`;
+   await new Promise(resolve=>setTimeout(resolve,4000));
+   const selectedItem = currentList[randomIndex];
+   if(stage ===1){
+     // 第一轮结束，切换菜品轮
+     tipDom.innerText = `选中大类：${selectedItem.name} → 第二轮挑选菜品`;
+     const foodArr = foodMap[selectedItem.name].map(name=>{
+       return {name:name,color:getRandomColor()};
+     })
+     currentList = foodArr;
+     stage =2;
+     drawWheel(currentList);
+     totalAngle = 0;
+   }else{
+     resultDom.innerText = `✅最终选择：${selectedItem.name}`;
+   }
+   btn.disabled = false;
+ }
+ // 初始化绘制大类转盘
+ drawWheel(currentList);
+ </script>
+ </body>
+ </html>
+ 
